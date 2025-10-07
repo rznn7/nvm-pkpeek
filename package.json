@@ -1,0 +1,27 @@
+{
+	"name": "nvm-pkpeek",
+	"version": "0.1.0",
+	"description": "Know your globally installed node packages",
+	"main": "index.js",
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"lint": "pnpm exec biome lint",
+		"format": "pnpm exec biome format"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"packageManager": "pnpm@10.17.1",
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"bin": {
+		"pkpeek": "./dist/index.js"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.2.5",
+		"@types/node": "^24.7.0",
+		"typescript": "^5.9.3"
+	}
+}

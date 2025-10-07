@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { readdir, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import path from 'node:path';
+import { readdir, readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import path from 'node:path'
 
 async function main() {
-	const nvmVersionsPath = path.join(homedir(), '.nvm', 'versions', 'node');
-	const installedNodeVersions = await readdir(nvmVersionsPath);
+	const nvmVersionsPath = path.join(homedir(), '.nvm', 'versions', 'node')
+	const installedNodeVersions = await readdir(nvmVersionsPath)
 
 	const nodeVersionsWithPackages = await Promise.all(
 		installedNodeVersions.map(async (versionFolder) => {
@@ -14,58 +14,59 @@ async function main() {
 				versionFolder,
 				'lib',
 				'node_modules',
-			);
+			)
 
-			const nodeModulesEntries = await readdir(nodeModulesPath);
+			const nodeModulesEntries = await readdir(nodeModulesPath)
 
 			const globalPackages = await Promise.all(
 				nodeModulesEntries.map(async (entry) => {
 					if (entry.startsWith('@')) {
-						const scopePath = path.join(nodeModulesPath, entry);
-						const packagesInScope = await readdir(scopePath);
+						const scopePath = path.join(nodeModulesPath, entry)
+						const packagesInScope = await readdir(scopePath)
 						const scopeInfos = await Promise.all(
 							packagesInScope.map(async (packageName) => {
 								const packagePath = path.join(
 									scopePath,
 									packageName,
 									'package.json',
-								);
-								const packageInfo = await extractPackageInfo(
-									packagePath,
-									entry,
-								);
-								return { [packageName]: packageInfo };
+								)
+								const packageInfo = await extractPackageInfo(packagePath)
+								return { [packageName]: packageInfo }
 							}),
-						);
-						return { [entry]: scopeInfos };
+						)
+						return { [entry]: scopeInfos }
 					} else {
 						const packagePath = path.join(
 							nodeModulesPath,
 							entry,
 							'package.json',
-						);
-						const packageInfo = await extractPackageInfo(packagePath, entry);
-						return { [entry]: packageInfo };
+						)
+						const packageInfo = await extractPackageInfo(packagePath)
+						return { [entry]: packageInfo }
 					}
 				}),
-			);
+			)
 
 			return {
 				version: versionFolder,
 				packages: globalPackages,
-			};
+			}
 		}),
-	);
+	)
 
-	console.dir(nodeVersionsWithPackages, { depth: null });
+	console.dir(nodeVersionsWithPackages, { depth: null })
 }
 
-main();
+main()
 
-async function extractPackageInfo(packagePath: string, entry: string) {
-	const packageJsonContent = await readFile(packagePath, 'utf8');
-	const packageData = JSON.parse(packageJsonContent);
-	const version = packageData.version;
+async function extractPackageInfo(packagePath: string) {
+	const packageJsonContent = await readFile(packagePath, 'utf8')
+	const packageData = JSON.parse(packageJsonContent)
+	const version = packageData.version
 
-	return { version };
+	if (typeof version === 'string') {
+		return { version }
+	}
+
+	return {}
 }

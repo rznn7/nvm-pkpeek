@@ -1,83 +1,128 @@
 #!/usr/bin/env node
+
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { program } from 'commander'
 
-async function main() {
-	const nvmVersionsPath = path.join(homedir(), '.nvm', 'versions', 'node')
-	const installedNodeVersions = await readdir(nvmVersionsPath)
-	const nodeVersionsWithPackages = await Promise.all(
-		installedNodeVersions.map(async (version) => {
-			const nodeModulesPath = path.join(
-				nvmVersionsPath,
-				version,
-				'lib',
-				'node_modules',
-			)
-			const nodeModulesEntries = await readdir(nodeModulesPath)
-			const packagesExtracted = await Promise.all(
-				extractPackages(nodeModulesEntries, nodeModulesPath),
-			)
-			const packages = packagesExtracted.flat().filter(Boolean)
-			return { version, packages }
-		}),
-	)
+interface PkPeekOptions {
+	nodeVersion?: string
+}
+
+type VersionInfo = {
+	version: string
+	packages: PackageInfo[]
+}
+
+type PackageInfo = Record<string, string>
+
+program
+	.name('nvm-pkpeek')
+	.description('Know your globally installed node packages')
+	.version('1.0.0')
+	.option('--node-version <node-version>', 'specific node version to check')
+	.action((options: PkPeekOptions) => main(options))
+
+program.parse()
+
+async function main(options: PkPeekOptions) {
+	const { versionToPeek } = processOptions(options)
+
+	const nvmPath = path.join(homedir(), '.nvm')
+	const detectedNodeVersions = await detectNodeVersions(nvmPath)
+	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
+	const nodeVersionsWithPackages = await extractVersions(versionsToPeek, nvmPath)
+
 	console.dir(nodeVersionsWithPackages, { depth: null })
 }
 
-main()
-
-function extractPackages(
-	nodeModulesEntries: string[],
-	nodeModulesPath: string,
-) {
-	return nodeModulesEntries.map(async (entry) => {
-		if (isScopeEntry(entry)) {
-			return await extractScopedPackage(nodeModulesPath, entry)
-		} else {
-			return await extractPlainPackage(nodeModulesPath, entry)
-		}
-	})
-}
-
-async function extractPlainPackage(
-	nodeModulesPath: string,
-	entry: string,
-): Promise<Record<string, string> | undefined> {
-	const packagePath = path.join(nodeModulesPath, entry, 'package.json')
-	const packageInfo = await extractPackageInfo(packagePath)
-	if (packageInfo) {
-		return { [packageInfo.name]: packageInfo.version }
+function processOptions(options: PkPeekOptions) {
+	return {
+		versionToPeek: processNodeVersionOption(options),
 	}
-	return undefined
 }
 
-async function extractScopedPackage(
-	nodeModulesPath: string,
-	entry: string,
-): Promise<(Record<string, string> | undefined)[]> {
-	const scopePath = path.join(nodeModulesPath, entry)
-	const packagesInScope = await readdir(scopePath)
-	const scopeInfos = await Promise.all(
-		packagesInScope.map(async (packageName) => {
-			const packagePath = path.join(scopePath, packageName, 'package.json')
-			const packageInfo = await extractPackageInfo(packagePath)
-			if (packageInfo) {
-				return { [`${entry}/${packageName}`]: packageInfo.version }
+function processNodeVersionOption(options: PkPeekOptions): string | undefined {
+	const { nodeVersion } = options
+	return nodeVersion ? normalizeVersion(nodeVersion) : undefined
+}
+
+async function detectNodeVersions(nvmPath: string) {
+	const nvmVersionsPath = path.join(nvmPath, 'versions', 'node')
+	try {
+		return await readdir(nvmVersionsPath)
+	} catch (_) {
+		console.error(`[nvm-pkpeek]: could not access nvm node versions directory: ${nvmVersionsPath}`)
+		process.exit(1)
+	}
+}
+
+function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string): string[] {
+	const detectedNodeVersionsWithoutPrefix = detectedNodeVersions.map(normalizeVersion)
+	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionToPeek))
+
+	if (versionsToPeek.length === 0) {
+		console.error(`[nvm-pkpeek]: could not find version ${versionToPeek}`)
+		console.info(`[nvm-pkpeek]: detected versions: ${detectedNodeVersions.join(', ')}`)
+		process.exit(1)
+	}
+
+	return versionsToPeek.map(addVersionPrefix)
+}
+
+async function extractVersions(versionsToPeek: string[], nvmPath: string): Promise<VersionInfo[]> {
+	return await Promise.all(
+		versionsToPeek.map(async version => {
+			const nodeModulesPath = path.join(nvmPath, 'versions', 'node', version, 'lib', 'node_modules')
+
+			try {
+				const nodeModulesEntries = await readdir(nodeModulesPath)
+				const packages = await extractPackages(nodeModulesEntries, nodeModulesPath)
+				return { version: normalizeVersion(version), packages }
+			} catch (_) {
+				return { version: normalizeVersion(version), packages: [] }
 			}
-			return undefined
 		}),
 	)
-	return scopeInfos.filter(Boolean)
 }
 
-async function extractPackageInfo(
-	packagePath: string,
-): Promise<{ name: string; version: string } | undefined> {
+async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: string): Promise<PackageInfo[]> {
+	const results = await Promise.all(
+		nodeModulesEntries.map(entry =>
+			isScopeEntry(entry) ? extractScopedPackage(nodeModulesPath, entry) : extractPlainPackage(nodeModulesPath, entry),
+		),
+	)
+	return results.flat()
+}
+
+async function extractPlainPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
+	const packageJsonPath = path.join(nodeModulesPath, entry, 'package.json')
+	const packageInfo = await extractPackageInfo(packageJsonPath)
+	return packageInfo ? [{ [packageInfo.name]: packageInfo.version }] : []
+}
+
+async function extractScopedPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
+	const scopePath = path.join(nodeModulesPath, entry)
+
 	try {
-		const packageJsonContent = await readFile(packagePath, 'utf8')
-		const packageData = JSON.parse(packageJsonContent)
-		const { name, version } = packageData
+		const packagesInScope = await readdir(scopePath)
+		const results = await Promise.all(
+			packagesInScope.map(async packageName => {
+				const packageJsonPath = path.join(scopePath, packageName, 'package.json')
+				const packageInfo = await extractPackageInfo(packageJsonPath)
+				return packageInfo ? [{ [packageInfo.name]: packageInfo.version }] : []
+			}),
+		)
+		return results.flat()
+	} catch (_) {
+		return []
+	}
+}
+
+async function extractPackageInfo(packageJsonPath: string): Promise<{ name: string; version: string } | undefined> {
+	try {
+		const packageJsonContent = await readFile(packageJsonPath, 'utf8')
+		const { name, version } = JSON.parse(packageJsonContent)
 		if (typeof name === 'string' && typeof version === 'string') {
 			return { name, version }
 		}
@@ -89,4 +134,12 @@ async function extractPackageInfo(
 
 function isScopeEntry(entry: string) {
 	return entry.startsWith('@')
+}
+
+function normalizeVersion(v: string) {
+	return v.replace(/^v/, '')
+}
+
+function addVersionPrefix(v: string) {
+	return `v${v}`
 }

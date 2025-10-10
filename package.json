@@ -3,6 +3,7 @@
 	"version": "0.1.0",
 	"description": "Know your globally installed node packages",
 	"main": "index.js",
+  "type": "module",
 	"scripts": {
 		"build": "tsc",
 		"dev": "tsc --watch",
@@ -11,7 +12,7 @@
 	},
 	"keywords": [],
 	"author": "",
-	"license": "ISC",
+	"license": "MIT",
 	"packageManager": "pnpm@10.17.1",
 	"engines": {
 		"node": ">=20.0.0"

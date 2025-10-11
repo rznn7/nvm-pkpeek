@@ -3,10 +3,11 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { program } from 'commander'
+import { Option, program } from 'commander'
 
 interface PkPeekOptions {
 	nodeVersion?: string
+	current?: boolean
 }
 
 type VersionInfo = {
@@ -19,8 +20,9 @@ type PackageInfo = Record<string, string>
 program
 	.name('nvm-pkpeek')
 	.description('Know your globally installed node packages')
-	.version('1.0.0')
-	.option('--node-version <node-version>', 'specific node version to check')
+	.version('0.1.0')
+	.addOption(new Option('--node-version <node-version>', 'specific node version to peek').conflicts('current'))
+	.addOption(new Option('--current', 'only peek currently used node version').conflicts('nodeVersion'))
 	.action((options: PkPeekOptions) => main(options))
 
 program.parse()
@@ -31,19 +33,24 @@ async function main(options: PkPeekOptions) {
 	const nvmPath = path.join(homedir(), '.nvm')
 	const detectedNodeVersions = await detectNodeVersions(nvmPath)
 	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
-	const nodeVersionsWithPackages = await extractVersions(versionsToPeek, nvmPath)
+	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	console.dir(nodeVersionsWithPackages, { depth: null })
+	console.dir(versionsInfo, { depth: null })
 }
 
-function processOptions(options: PkPeekOptions) {
-	return {
-		versionToPeek: processNodeVersionOption(options),
-	}
+function processOptions(options: PkPeekOptions): { versionToPeek?: string } {
+	const { current, nodeVersion } = options
+	if (current) return { versionToPeek: getCurrentNvmNodeVersion() }
+	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion) }
+
+	return {}
 }
 
-function processNodeVersionOption(options: PkPeekOptions): string | undefined {
-	const { nodeVersion } = options
+function getCurrentNvmNodeVersion(): string {
+	return normalizeVersion(process.version)
+}
+
+function processNodeVersionOption(nodeVersion: string): string | undefined {
 	return nodeVersion ? normalizeVersion(nodeVersion) : undefined
 }
 
@@ -51,7 +58,7 @@ async function detectNodeVersions(nvmPath: string) {
 	const nvmVersionsPath = path.join(nvmPath, 'versions', 'node')
 	try {
 		return await readdir(nvmVersionsPath)
-	} catch (_) {
+	} catch {
 		console.error(`[nvm-pkpeek]: could not access nvm node versions directory: ${nvmVersionsPath}`)
 		process.exit(1)
 	}
@@ -79,7 +86,7 @@ async function extractVersions(versionsToPeek: string[], nvmPath: string): Promi
 				const nodeModulesEntries = await readdir(nodeModulesPath)
 				const packages = await extractPackages(nodeModulesEntries, nodeModulesPath)
 				return { version: normalizeVersion(version), packages }
-			} catch (_) {
+			} catch {
 				return { version: normalizeVersion(version), packages: [] }
 			}
 		}),
@@ -127,7 +134,7 @@ async function extractPackageInfo(packageJsonPath: string): Promise<{ name: stri
 			return { name, version }
 		}
 		return undefined
-	} catch (_) {
+	} catch {
 		return undefined
 	}
 }

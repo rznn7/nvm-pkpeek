@@ -4,13 +4,12 @@ import { error, log } from 'node:console'
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { Ansis, dim, red } from 'ansis'
+import { Ansis, bold, dim, red } from 'ansis'
 import { Option, program } from 'commander'
 
 interface PkPeekOptions {
-	nodeVersion?: string
 	current?: boolean
-	format: DisplayFormat
+	format?: DisplayFormat
 	color?: boolean
 }
 
@@ -26,44 +25,60 @@ interface PackageInfo {
 	version: string
 }
 
-const safeAnsis = (noColors: boolean) => (noColors ? new Ansis(0) : new Ansis())
+const safeAnsis = (noColor: boolean) => (noColor ? new Ansis(0) : new Ansis())
 
 program
 	.name('nvm-pkpeek')
 	.description('Know your globally installed node packages')
 	.version('0.1.0')
-	.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']).default('pretty'))
-	.addOption(new Option('--node-version <node-version>', 'specific node version to peek').conflicts('current'))
-	.addOption(new Option('-c, --current', 'peek currently used node version').conflicts('nodeVersion'))
+	.argument('[node-version]', 'node version prefix to peek (e.g., "22" matches "22.x.x")')
+	.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']))
+	.addOption(new Option('-c, --current', 'peek currently used node version'))
 	.addOption(new Option('--no-color', 'disable colored output (only affects pretty format)'))
-	.action((options: PkPeekOptions) => main(options))
+	.action((nodeVersion: string | undefined, options: PkPeekOptions) => {
+		if (nodeVersion && options.current) {
+			error(red('[nvm-pkpeek]: cannot use both [node-version] argument and -c/--current flag'))
+			process.exit(1)
+		}
+		main(nodeVersion, options)
+	})
 
 program.parse()
 
-async function main(options: PkPeekOptions) {
-	const { versionToPeek, displayFormat, noColor: noColors } = processOptions(options)
-
+async function main(nodeVersion: string | undefined, options: PkPeekOptions) {
+	const { useCurrentVersion, displayFormat, noColor } = processOptions(options)
+	const versionFilter = getVersionFilter(useCurrentVersion, nodeVersion)
 	const nvmPath = path.join(homedir(), '.nvm')
 	const detectedNodeVersions = await detectNodeVersions(nvmPath)
-	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
+	const versionsToPeek = getVersionsToPeek(detectedNodeVersions, versionFilter)
 	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	display(versionsInfo, displayFormat, noColors)
+	display(versionsInfo, displayFormat, noColor)
 }
 
-function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat, noColors: boolean) {
+function getVersionFilter(useCurrentVersion: boolean | undefined, nodeVersion: string | undefined) {
+	if (useCurrentVersion) {
+		return getCurrentNvmNodeVersion()
+	} else if (nodeVersion) {
+		return normalizeVersion(nodeVersion)
+	} else {
+		return undefined
+	}
+}
+
+function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat, noColor: boolean) {
 	const displayHandlers: Record<DisplayFormat, () => void> = {
-		pretty: () => displayPretty(versionsInfo, noColors),
+		pretty: () => displayPretty(versionsInfo, noColor),
 		unix: () => displayUnix(versionsInfo),
 	}
 
 	displayHandlers[displayFormat]()
 }
 
-function displayPretty(versionsInfo: VersionInfo[], noColors: boolean) {
+function displayPretty(versionsInfo: VersionInfo[], noColor: boolean) {
 	const allPackageNameLengths = versionsInfo.flatMap(version => version.packages.map(pkg => pkg.name.length))
 	const maxPackageNameLength = allPackageNameLengths.length > 0 ? Math.max(...allPackageNameLengths) : 0
-	const ansis = safeAnsis(noColors)
+	const ansis = safeAnsis(noColor)
 
 	versionsInfo.forEach(version => {
 		log(ansis.bold.cyan(`▸ Node ${version.version}`))
@@ -82,24 +97,16 @@ function displayUnix(versionsInfo: VersionInfo[]) {
 }
 
 function processOptions(options: PkPeekOptions) {
-	const { current, nodeVersion, format, color } = options
+	const { current, format, color } = options
 	const noColor = !color
-	const displayFormat = format
-	const versionToPeek = current
-		? getCurrentNvmNodeVersion()
-		: nodeVersion
-			? processNodeVersionOption(nodeVersion)
-			: undefined
+	const displayFormat = format ?? 'pretty'
+	const useCurrentVersion = current
 
-	return { versionToPeek, displayFormat, noColor }
+	return { useCurrentVersion, displayFormat, noColor }
 }
 
 function getCurrentNvmNodeVersion() {
 	return normalizeVersion(process.version)
-}
-
-function processNodeVersionOption(nodeVersion: string) {
-	return nodeVersion ? normalizeVersion(nodeVersion) : undefined
 }
 
 async function detectNodeVersions(nvmPath: string) {
@@ -112,20 +119,22 @@ async function detectNodeVersions(nvmPath: string) {
 	}
 }
 
-function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string) {
+function getVersionsToPeek(detectedNodeVersions: string[], versionFilter?: string) {
+	if (!versionFilter) return detectedNodeVersions
+
 	const detectedNodeVersionsWithoutPrefix = detectedNodeVersions.map(normalizeVersion)
-	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionToPeek))
+	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionFilter))
 
 	if (versionsToPeek.length === 0) {
-		error(red(`[nvm-pkpeek]: could not find version ${versionToPeek}`))
-		error(dim(`[nvm-pkpeek]: detected versions: ${detectedNodeVersions.join(', ')}`))
+		error(red(`[nvm-pkpeek]: could not find version with prefix: ${bold(versionFilter)}`))
+		error(dim(`[nvm-pkpeek]: detected versions: ${bold(detectedNodeVersions.join(', '))}`))
 		process.exit(1)
 	}
 
 	return versionsToPeek.map(addVersionPrefix)
 }
 
-async function extractVersions(versionsToPeek: string[], nvmPath: string) {
+async function extractVersions(versionsToPeek: string[], nvmPath: string): Promise<VersionInfo[]> {
 	return await Promise.all(
 		versionsToPeek.map(async version => {
 			const nodeModulesPath = path.join(nvmPath, 'versions', 'node', version, 'lib', 'node_modules')

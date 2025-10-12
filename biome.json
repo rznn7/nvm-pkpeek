@@ -18,7 +18,10 @@
 		"includes": ["src/**/*.ts"],
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"style": {
+				"noNestedTernary": "error"
+			}
 		}
 	},
 	"javascript": {

@@ -4,13 +4,16 @@ import { error, log } from 'node:console'
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { dim, red } from 'ansis'
+import { bold, cyan, dim, red } from 'ansis'
 import { Option, program } from 'commander'
 
 interface PkPeekOptions {
 	nodeVersion?: string
 	current?: boolean
+	format: DisplayFormat
 }
+
+type DisplayFormat = 'pretty' | 'unix'
 
 interface VersionInfo {
 	version: string
@@ -26,21 +29,43 @@ program
 	.name('nvm-pkpeek')
 	.description('Know your globally installed node packages')
 	.version('0.1.0')
+	.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']).default('pretty'))
 	.addOption(new Option('--node-version <node-version>', 'specific node version to peek').conflicts('current'))
-	.addOption(new Option('--current', 'only peek currently used node version').conflicts('nodeVersion'))
+	.addOption(new Option('-c, --current', 'peek currently used node version').conflicts('nodeVersion'))
 	.action((options: PkPeekOptions) => main(options))
 
 program.parse()
 
 async function main(options: PkPeekOptions) {
-	const { versionToPeek } = processOptions(options)
+	const { versionToPeek, displayFormat } = processOptions(options)
 
 	const nvmPath = path.join(homedir(), '.nvm')
 	const detectedNodeVersions = await detectNodeVersions(nvmPath)
 	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
 	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	displayUnix(versionsInfo)
+	display(versionsInfo, displayFormat)
+}
+
+function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat) {
+	const displayHandlers: Record<DisplayFormat, () => void> = {
+		pretty: () => displayPretty(versionsInfo),
+		unix: () => displayUnix(versionsInfo),
+	}
+
+	displayHandlers[displayFormat]()
+}
+
+function displayPretty(versionsInfo: VersionInfo[]) {
+	const allPackageNameLengths = versionsInfo.flatMap(version => version.packages.map(pkg => pkg.name.length))
+	const maxPackageNameLength = allPackageNameLengths.length > 0 ? Math.max(...allPackageNameLengths) : 0
+
+	versionsInfo.forEach(version => {
+		log(bold.cyan(`▸ Node ${version.version}`))
+		version.packages.forEach(pkg => {
+			log(`    ${pkg.name.padEnd(maxPackageNameLength + 2)}${dim(pkg.version)}`)
+		})
+	})
 }
 
 function displayUnix(versionsInfo: VersionInfo[]) {
@@ -51,12 +76,12 @@ function displayUnix(versionsInfo: VersionInfo[]) {
 	})
 }
 
-function processOptions(options: PkPeekOptions): { versionToPeek?: string } {
-	const { current, nodeVersion } = options
-	if (current) return { versionToPeek: getCurrentNvmNodeVersion() }
-	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion) }
+function processOptions(options: PkPeekOptions): { versionToPeek?: string; displayFormat: DisplayFormat } {
+	const { current, nodeVersion, format } = options
+	if (current) return { versionToPeek: getCurrentNvmNodeVersion(), displayFormat: format }
+	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion), displayFormat: format }
 
-	return {}
+	return { displayFormat: format }
 }
 
 function getCurrentNvmNodeVersion(): string {
@@ -134,7 +159,7 @@ async function extractScopedPackage(nodeModulesPath: string, entry: string): Pro
 			}),
 		)
 		return results.flat()
-	} catch (_) {
+	} catch {
 		return []
 	}
 }

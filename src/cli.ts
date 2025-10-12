@@ -3,6 +3,7 @@ import { red } from 'ansis'
 import { Option, program } from 'commander'
 import { type DisplayFormat, display } from './display.js'
 import { extractNvmPackages } from './extractor.js'
+import { peek } from './core.js'
 
 export interface CliOptions {
 	current?: boolean
@@ -30,7 +31,7 @@ async function runCli(nodeVersion: string | undefined, options: CliOptions) {
 		process.exit(1)
 	}
 	try {
-		await run(nodeVersion, options)
+		await peek(nodeVersion, options)
 	} catch (err) {
 		if (err instanceof Error) {
 			error(red(`[nvm-pkpeek]: ${err.message}`))
@@ -39,38 +40,4 @@ async function runCli(nodeVersion: string | undefined, options: CliOptions) {
 		}
 		process.exit(1)
 	}
-}
-
-async function run(nodeVersion: string | undefined, options: CliOptions) {
-	const { useCurrentVersion } = processOptions(options)
-	const versionFilter = getVersionFilter(useCurrentVersion, nodeVersion)
-
-	const versionsInfo = await extractNvmPackages({ versionFilter })
-
-	display(versionsInfo, options)
-}
-
-function processOptions(options: CliOptions) {
-	const { current } = options
-	const useCurrentVersion = current
-
-	return { useCurrentVersion }
-}
-
-function getVersionFilter(useCurrentVersion: boolean | undefined, nodeVersion: string | undefined) {
-	if (useCurrentVersion) {
-		return getCurrentNvmNodeVersion()
-	}
-	if (nodeVersion) {
-		return normalizeVersion(nodeVersion)
-	}
-	return undefined
-}
-
-function getCurrentNvmNodeVersion() {
-	return normalizeVersion(process.version)
-}
-
-function normalizeVersion(v: string): string {
-	return v.replace(/^v/, '')
 }

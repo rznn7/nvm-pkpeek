@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { dir, error } from 'node:console'
+import { error, log } from 'node:console'
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -12,12 +12,15 @@ interface PkPeekOptions {
 	current?: boolean
 }
 
-type VersionInfo = {
+interface VersionInfo {
 	version: string
 	packages: PackageInfo[]
 }
 
-type PackageInfo = Record<string, string>
+interface PackageInfo {
+	name: string
+	version: string
+}
 
 program
 	.name('nvm-pkpeek')
@@ -37,7 +40,15 @@ async function main(options: PkPeekOptions) {
 	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
 	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	dir(versionsInfo, { depth: null })
+	displayUnix(versionsInfo)
+}
+
+function displayUnix(versionsInfo: VersionInfo[]) {
+	versionsInfo.forEach(version => {
+		version.packages.forEach(pkg => {
+			log(`${version.version}\t${pkg.name}\t${pkg.version}`)
+		})
+	})
 }
 
 function processOptions(options: PkPeekOptions): { versionToPeek?: string } {
@@ -107,7 +118,7 @@ async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: st
 async function extractPlainPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
 	const packageJsonPath = path.join(nodeModulesPath, entry, 'package.json')
 	const packageInfo = await extractPackageInfo(packageJsonPath)
-	return packageInfo ? [{ [packageInfo.name]: packageInfo.version }] : []
+	return packageInfo ? [packageInfo] : []
 }
 
 async function extractScopedPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
@@ -119,7 +130,7 @@ async function extractScopedPackage(nodeModulesPath: string, entry: string): Pro
 			packagesInScope.map(async packageName => {
 				const packageJsonPath = path.join(scopePath, packageName, 'package.json')
 				const packageInfo = await extractPackageInfo(packageJsonPath)
-				return packageInfo ? [{ [packageInfo.name]: packageInfo.version }] : []
+				return packageInfo ? [packageInfo] : []
 			}),
 		)
 		return results.flat()

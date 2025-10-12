@@ -4,13 +4,14 @@ import { error, log } from 'node:console'
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { bold, cyan, dim, red } from 'ansis'
+import { Ansis, dim, red } from 'ansis'
 import { Option, program } from 'commander'
 
 interface PkPeekOptions {
 	nodeVersion?: string
 	current?: boolean
 	format: DisplayFormat
+	color?: boolean
 }
 
 type DisplayFormat = 'pretty' | 'unix'
@@ -25,6 +26,8 @@ interface PackageInfo {
 	version: string
 }
 
+const safeAnsis = (noColors: boolean) => (noColors ? new Ansis(0) : new Ansis())
+
 program
 	.name('nvm-pkpeek')
 	.description('Know your globally installed node packages')
@@ -32,38 +35,40 @@ program
 	.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']).default('pretty'))
 	.addOption(new Option('--node-version <node-version>', 'specific node version to peek').conflicts('current'))
 	.addOption(new Option('-c, --current', 'peek currently used node version').conflicts('nodeVersion'))
+	.addOption(new Option('--no-color', 'disable colored output (only affects pretty format)'))
 	.action((options: PkPeekOptions) => main(options))
 
 program.parse()
 
 async function main(options: PkPeekOptions) {
-	const { versionToPeek, displayFormat } = processOptions(options)
+	const { versionToPeek, displayFormat, noColor: noColors } = processOptions(options)
 
 	const nvmPath = path.join(homedir(), '.nvm')
 	const detectedNodeVersions = await detectNodeVersions(nvmPath)
 	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
 	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	display(versionsInfo, displayFormat)
+	display(versionsInfo, displayFormat, noColors)
 }
 
-function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat) {
+function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat, noColors: boolean) {
 	const displayHandlers: Record<DisplayFormat, () => void> = {
-		pretty: () => displayPretty(versionsInfo),
+		pretty: () => displayPretty(versionsInfo, noColors),
 		unix: () => displayUnix(versionsInfo),
 	}
 
 	displayHandlers[displayFormat]()
 }
 
-function displayPretty(versionsInfo: VersionInfo[]) {
+function displayPretty(versionsInfo: VersionInfo[], noColors: boolean) {
 	const allPackageNameLengths = versionsInfo.flatMap(version => version.packages.map(pkg => pkg.name.length))
 	const maxPackageNameLength = allPackageNameLengths.length > 0 ? Math.max(...allPackageNameLengths) : 0
+	const ansis = safeAnsis(noColors)
 
 	versionsInfo.forEach(version => {
-		log(bold.cyan(`▸ Node ${version.version}`))
+		log(ansis.bold.cyan(`▸ Node ${version.version}`))
 		version.packages.forEach(pkg => {
-			log(`    ${pkg.name.padEnd(maxPackageNameLength + 2)}${dim(pkg.version)}`)
+			log(`    ${pkg.name.padEnd(maxPackageNameLength + 2)}${ansis.dim(pkg.version)}`)
 		})
 	})
 }
@@ -76,12 +81,18 @@ function displayUnix(versionsInfo: VersionInfo[]) {
 	})
 }
 
-function processOptions(options: PkPeekOptions): { versionToPeek?: string; displayFormat: DisplayFormat } {
-	const { current, nodeVersion, format } = options
-	if (current) return { versionToPeek: getCurrentNvmNodeVersion(), displayFormat: format }
-	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion), displayFormat: format }
+function processOptions(options: PkPeekOptions): {
+	versionToPeek?: string
+	displayFormat: DisplayFormat
+	noColor: boolean
+} {
+	const { current, nodeVersion, format, color } = options
+	const noColor = !color
 
-	return { displayFormat: format }
+	if (current) return { versionToPeek: getCurrentNvmNodeVersion(), displayFormat: format, noColor }
+	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion), displayFormat: format, noColor }
+
+	return { displayFormat: format, noColor }
 }
 
 function getCurrentNvmNodeVersion(): string {

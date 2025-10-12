@@ -1,7 +1,7 @@
 import { log } from 'node:console'
 import { Ansis } from 'ansis'
+import type { CliOptions } from './cli.js'
 import type { VersionInfo } from './extractor.js'
-import type { PkPeekOptions } from './index.js'
 
 export type DisplayFormat = 'pretty' | 'unix'
 
@@ -10,7 +10,7 @@ export interface DisplayOptions {
 	noColor?: boolean
 }
 
-export function display(versionsInfo: VersionInfo[], options: PkPeekOptions) {
+export function display(versionsInfo: VersionInfo[], options: CliOptions) {
 	const { format = 'pretty', color = true } = options
 
 	const displayHandlers: Record<DisplayFormat, () => void> = {

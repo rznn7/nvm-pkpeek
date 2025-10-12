@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { dir, error } from 'node:console'
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { dim, red } from 'ansis'
 import { Option, program } from 'commander'
 
 interface PkPeekOptions {
@@ -35,7 +37,7 @@ async function main(options: PkPeekOptions) {
 	const versionsToPeek = versionToPeek ? getVersionsToPeek(detectedNodeVersions, versionToPeek) : detectedNodeVersions
 	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
 
-	console.dir(versionsInfo, { depth: null })
+	dir(versionsInfo, { depth: null })
 }
 
 function processOptions(options: PkPeekOptions): { versionToPeek?: string } {
@@ -59,7 +61,7 @@ async function detectNodeVersions(nvmPath: string) {
 	try {
 		return await readdir(nvmVersionsPath)
 	} catch {
-		console.error(`[nvm-pkpeek]: could not access nvm node versions directory: ${nvmVersionsPath}`)
+		error(red(`[nvm-pkpeek]: could not access nvm node versions directory: ${nvmVersionsPath}`))
 		process.exit(1)
 	}
 }
@@ -69,8 +71,8 @@ function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string
 	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionToPeek))
 
 	if (versionsToPeek.length === 0) {
-		console.error(`[nvm-pkpeek]: could not find version ${versionToPeek}`)
-		console.info(`[nvm-pkpeek]: detected versions: ${detectedNodeVersions.join(', ')}`)
+		error(red(`[nvm-pkpeek]: could not find version ${versionToPeek}`))
+		error(dim(`[nvm-pkpeek]: detected versions: ${detectedNodeVersions.join(', ')}`))
 		process.exit(1)
 	}
 

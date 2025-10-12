@@ -3,17 +3,12 @@ import { Ansis } from 'ansis'
 import type { CliOptions } from './cli.js'
 import type { VersionInfo } from './extractor.js'
 
-export type DisplayFormat = 'pretty' | 'unix'
+export type DisplayOptions = Pick<CliOptions, 'format' | 'color'>
 
-export interface DisplayOptions {
-	format?: DisplayFormat
-	noColor?: boolean
-}
-
-export function display(versionsInfo: VersionInfo[], options: CliOptions) {
+export function display(versionsInfo: VersionInfo[], options: DisplayOptions) {
 	const { format = 'pretty', color = true } = options
 
-	const displayHandlers: Record<DisplayFormat, () => void> = {
+	const displayHandlers: Record<typeof format, () => void> = {
 		pretty: () => displayPretty(versionsInfo, color),
 		unix: () => displayUnix(versionsInfo),
 	}

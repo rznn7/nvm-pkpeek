@@ -3,7 +3,7 @@ import { display } from './display.js'
 import { extractNvmPackages } from './extractor.js'
 
 export async function peek(nodeVersion: string | undefined, options: CliOptions) {
-	const { current } = options
+	const { current = false } = options
 	const versionFilter = getVersionFilter(nodeVersion, current)
 	const versionsInfo = await extractNvmPackages({ versionFilter })
 

@@ -1,13 +1,11 @@
 import { error } from 'node:console'
 import { red } from 'ansis'
 import { Option, program } from 'commander'
-import { type DisplayFormat, display } from './display.js'
-import { extractNvmPackages } from './extractor.js'
 import { peek } from './core.js'
 
 export interface CliOptions {
 	current?: boolean
-	format?: DisplayFormat
+	format?: 'pretty' | 'unix'
 	color?: boolean
 }
 

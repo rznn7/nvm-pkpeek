@@ -18,7 +18,7 @@ export interface ExtractorOptions {
 }
 
 export async function extractNvmPackages(options: ExtractorOptions = {}): Promise<VersionInfo[]> {
-	const { versionFilter, nvmPath = getNvmPath() } = options
+	const { versionFilter = '', nvmPath = getNvmPath() } = options
 	const detectedNodeVersions = await detectNodeVersions(nvmPath)
 	const versionsToPeek = getVersionsToPeek(detectedNodeVersions, versionFilter)
 	return await extractVersions(versionsToPeek, nvmPath)
@@ -37,7 +37,7 @@ async function detectNodeVersions(nvmPath: string) {
 	}
 }
 
-function getVersionsToPeek(detectedNodeVersions: string[], versionFilter?: string) {
+function getVersionsToPeek(detectedNodeVersions: string[], versionFilter: string) {
 	if (!versionFilter) return detectedNodeVersions
 
 	const detectedNodeVersionsWithoutPrefix = detectedNodeVersions.map(normalizeVersion)
@@ -45,8 +45,7 @@ function getVersionsToPeek(detectedNodeVersions: string[], versionFilter?: strin
 
 	if (versionsToPeek.length === 0) {
 		throw new Error(
-			`could not find version with prefix: ${versionFilter}\n` +
-				`detected versions: ${detectedNodeVersions.join(', ')}`,
+			`could not find version with prefix: ${versionFilter}\ndetected versions: ${detectedNodeVersions.join(', ')}`,
 		)
 	}
 

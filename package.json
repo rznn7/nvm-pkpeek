@@ -4,12 +4,15 @@
 	"description": "Know your globally installed node packages",
 	"main": "index.js",
 	"type": "module",
+  "exclude": ["test"],
 	"scripts": {
 		"run": "tsx src/index.ts",
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"lint": "pnpm exec biome lint",
-		"format": "pnpm exec biome format"
+		"format": "pnpm exec biome format",
+    "test": "vitest",
+    "test:run": "vitest run"
 	},
 	"keywords": [],
 	"author": "",
@@ -25,7 +28,8 @@
 		"@biomejs/biome": "^2.2.5",
 		"@types/node": "^24.7.0",
 		"tsx": "^4.20.6",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.4"
 	},
 	"dependencies": {
 		"ansis": "^4.2.0",

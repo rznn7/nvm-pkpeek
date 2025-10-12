@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 
-import { error, log } from 'node:console'
-import { Ansis, red } from 'ansis'
+import { error } from 'node:console'
+import { red } from 'ansis'
 import { Option, program } from 'commander'
-import { extractNvmPackages, type VersionInfo } from './extractor.js'
+import { type DisplayFormat, display } from './display.js'
+import { extractNvmPackages } from './extractor.js'
 
 export interface PkPeekOptions {
 	current?: boolean
 	format?: DisplayFormat
 	color?: boolean
 }
-
-export type DisplayFormat = 'pretty' | 'unix'
 
 program
 	.name('nvm-pkpeek')
@@ -43,68 +42,34 @@ async function runCli(nodeVersion: string | undefined, options: PkPeekOptions) {
 }
 
 async function main(nodeVersion: string | undefined, options: PkPeekOptions) {
-	const { useCurrentVersion, displayFormat, noColor } = processOptions(options)
+	const { useCurrentVersion } = processOptions(options)
 	const versionFilter = getVersionFilter(useCurrentVersion, nodeVersion)
 
 	const versionsInfo = await extractNvmPackages({ versionFilter })
 
-	display(versionsInfo, displayFormat, noColor)
+	display(versionsInfo, options)
 }
 
 function processOptions(options: PkPeekOptions) {
-	const { current, format, color } = options
-	const noColor = !color
-	const displayFormat = format ?? 'pretty'
+	const { current } = options
 	const useCurrentVersion = current
 
-	return { useCurrentVersion, displayFormat, noColor }
+	return { useCurrentVersion }
 }
 
 function getVersionFilter(useCurrentVersion: boolean | undefined, nodeVersion: string | undefined) {
 	if (useCurrentVersion) {
 		return getCurrentNvmNodeVersion()
-	} else if (nodeVersion) {
-		return normalizeVersion(nodeVersion)
-	} else {
-		return undefined
 	}
+	if (nodeVersion) {
+		return normalizeVersion(nodeVersion)
+	}
+	return undefined
 }
 
 function getCurrentNvmNodeVersion() {
 	return normalizeVersion(process.version)
 }
-
-function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat, noColor: boolean) {
-	const displayHandlers: Record<DisplayFormat, () => void> = {
-		pretty: () => displayPretty(versionsInfo, noColor),
-		unix: () => displayUnix(versionsInfo),
-	}
-
-	displayHandlers[displayFormat]()
-}
-
-function displayPretty(versionsInfo: VersionInfo[], noColor: boolean) {
-	const allPackageNameLengths = versionsInfo.flatMap(version => version.packages.map(pkg => pkg.name.length))
-	const maxPackageNameLength = allPackageNameLengths.length > 0 ? Math.max(...allPackageNameLengths) : 0
-	const ansis = safeAnsis(noColor)
-
-	versionsInfo.forEach(version => {
-		log(ansis.bold.cyan(`▸ Node ${version.version}`))
-		version.packages.forEach(pkg => {
-			log(`    ${pkg.name.padEnd(maxPackageNameLength + 2)}${ansis.dim(pkg.version)}`)
-		})
-	})
-}
-
-function displayUnix(versionsInfo: VersionInfo[]) {
-	versionsInfo.forEach(version => {
-		version.packages.forEach(pkg => {
-			log(`${version.version}\t${pkg.name}\t${pkg.version}`)
-		})
-	})
-}
-
-const safeAnsis = (noColor: boolean) => (noColor ? new Ansis(0) : new Ansis())
 
 function normalizeVersion(v: string): string {
 	return v.replace(/^v/, '')

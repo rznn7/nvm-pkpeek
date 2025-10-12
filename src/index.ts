@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
 import { error, log } from 'node:console'
-import { readdir, readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import path from 'node:path'
 import { Ansis, red } from 'ansis'
 import { Option, program } from 'commander'
+import { extractNvmPackages, type VersionInfo } from './extractor.js'
 
 export interface PkPeekOptions {
 	current?: boolean
@@ -14,16 +12,6 @@ export interface PkPeekOptions {
 }
 
 export type DisplayFormat = 'pretty' | 'unix'
-
-export interface VersionInfo {
-	version: string
-	packages: PackageInfo[]
-}
-
-export interface PackageInfo {
-	name: string
-	version: string
-}
 
 program
 	.name('nvm-pkpeek')
@@ -57,10 +45,8 @@ async function runCli(nodeVersion: string | undefined, options: PkPeekOptions) {
 async function main(nodeVersion: string | undefined, options: PkPeekOptions) {
 	const { useCurrentVersion, displayFormat, noColor } = processOptions(options)
 	const versionFilter = getVersionFilter(useCurrentVersion, nodeVersion)
-	const nvmPath = getNvmPath()
-	const detectedNodeVersions = await detectNodeVersions(nvmPath)
-	const versionsToPeek = getVersionsToPeek(detectedNodeVersions, versionFilter)
-	const versionsInfo = await extractVersions(versionsToPeek, nvmPath)
+
+	const versionsInfo = await extractNvmPackages({ versionFilter })
 
 	display(versionsInfo, displayFormat, noColor)
 }
@@ -86,97 +72,6 @@ function getVersionFilter(useCurrentVersion: boolean | undefined, nodeVersion: s
 
 function getCurrentNvmNodeVersion() {
 	return normalizeVersion(process.version)
-}
-
-function getNvmPath(): string {
-	return process.env.NVM_DIR || path.join(homedir(), '.nvm')
-}
-
-async function detectNodeVersions(nvmPath: string): Promise<string[]> {
-	const nvmVersionsPath = path.join(nvmPath, 'versions', 'node')
-	try {
-		return await readdir(nvmVersionsPath)
-	} catch {
-		throw new Error(`could not access nvm node versions directory: ${nvmVersionsPath}`)
-	}
-}
-
-function getVersionsToPeek(detectedNodeVersions: string[], versionFilter?: string): string[] {
-	if (!versionFilter) return detectedNodeVersions
-
-	const detectedNodeVersionsWithoutPrefix = detectedNodeVersions.map(normalizeVersion)
-	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionFilter))
-
-	if (versionsToPeek.length === 0) {
-		throw new Error(
-			`could not find version with prefix: ${versionFilter}\n` +
-				`detected versions: ${detectedNodeVersions.join(', ')}`,
-		)
-	}
-
-	return versionsToPeek.map(addVersionPrefix)
-}
-
-async function extractVersions(versionsToPeek: string[], nvmPath: string): Promise<VersionInfo[]> {
-	return await Promise.all(
-		versionsToPeek.map(async version => {
-			const nodeModulesPath = path.join(nvmPath, 'versions', 'node', version, 'lib', 'node_modules')
-
-			try {
-				const nodeModulesEntries = await readdir(nodeModulesPath)
-				const packages = await extractPackages(nodeModulesEntries, nodeModulesPath)
-				return { version: normalizeVersion(version), packages }
-			} catch {
-				return { version: normalizeVersion(version), packages: [] }
-			}
-		}),
-	)
-}
-
-async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: string): Promise<PackageInfo[]> {
-	const results = await Promise.all(
-		nodeModulesEntries.map(entry =>
-			isScopeEntry(entry) ? extractScopedPackage(nodeModulesPath, entry) : extractPlainPackage(nodeModulesPath, entry),
-		),
-	)
-	return results.flat()
-}
-
-async function extractPlainPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
-	const packageJsonPath = path.join(nodeModulesPath, entry, 'package.json')
-	const packageInfo = await extractPackageInfo(packageJsonPath)
-	return packageInfo ? [packageInfo] : []
-}
-
-async function extractScopedPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
-	const scopePath = path.join(nodeModulesPath, entry)
-
-	try {
-		const packagesInScope = await readdir(scopePath)
-		const results = await Promise.all(
-			packagesInScope.map(async packageName => {
-				const packageJsonPath = path.join(scopePath, packageName, 'package.json')
-				const packageInfo = await extractPackageInfo(packageJsonPath)
-				return packageInfo ? [packageInfo] : []
-			}),
-		)
-		return results.flat()
-	} catch {
-		return []
-	}
-}
-
-async function extractPackageInfo(packageJsonPath: string): Promise<PackageInfo | undefined> {
-	try {
-		const packageJsonContent = await readFile(packageJsonPath, 'utf8')
-		const { name, version } = JSON.parse(packageJsonContent)
-		if (typeof name === 'string' && typeof version === 'string') {
-			return { name, version }
-		}
-		return undefined
-	} catch {
-		return undefined
-	}
 }
 
 function display(versionsInfo: VersionInfo[], displayFormat: DisplayFormat, noColor: boolean) {
@@ -211,14 +106,6 @@ function displayUnix(versionsInfo: VersionInfo[]) {
 
 const safeAnsis = (noColor: boolean) => (noColor ? new Ansis(0) : new Ansis())
 
-function isScopeEntry(entry: string): boolean {
-	return entry.startsWith('@')
-}
-
 function normalizeVersion(v: string): string {
 	return v.replace(/^v/, '')
-}
-
-function addVersionPrefix(v: string): string {
-	return `v${v}`
 }

@@ -81,25 +81,24 @@ function displayUnix(versionsInfo: VersionInfo[]) {
 	})
 }
 
-function processOptions(options: PkPeekOptions): {
-	versionToPeek?: string
-	displayFormat: DisplayFormat
-	noColor: boolean
-} {
+function processOptions(options: PkPeekOptions) {
 	const { current, nodeVersion, format, color } = options
 	const noColor = !color
+	const displayFormat = format
+	const versionToPeek = current
+		? getCurrentNvmNodeVersion()
+		: nodeVersion
+			? processNodeVersionOption(nodeVersion)
+			: undefined
 
-	if (current) return { versionToPeek: getCurrentNvmNodeVersion(), displayFormat: format, noColor }
-	if (nodeVersion) return { versionToPeek: processNodeVersionOption(nodeVersion), displayFormat: format, noColor }
-
-	return { displayFormat: format, noColor }
+	return { versionToPeek, displayFormat, noColor }
 }
 
-function getCurrentNvmNodeVersion(): string {
+function getCurrentNvmNodeVersion() {
 	return normalizeVersion(process.version)
 }
 
-function processNodeVersionOption(nodeVersion: string): string | undefined {
+function processNodeVersionOption(nodeVersion: string) {
 	return nodeVersion ? normalizeVersion(nodeVersion) : undefined
 }
 
@@ -113,7 +112,7 @@ async function detectNodeVersions(nvmPath: string) {
 	}
 }
 
-function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string): string[] {
+function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string) {
 	const detectedNodeVersionsWithoutPrefix = detectedNodeVersions.map(normalizeVersion)
 	const versionsToPeek = detectedNodeVersionsWithoutPrefix.filter(v => v.startsWith(versionToPeek))
 
@@ -126,7 +125,7 @@ function getVersionsToPeek(detectedNodeVersions: string[], versionToPeek: string
 	return versionsToPeek.map(addVersionPrefix)
 }
 
-async function extractVersions(versionsToPeek: string[], nvmPath: string): Promise<VersionInfo[]> {
+async function extractVersions(versionsToPeek: string[], nvmPath: string) {
 	return await Promise.all(
 		versionsToPeek.map(async version => {
 			const nodeModulesPath = path.join(nvmPath, 'versions', 'node', version, 'lib', 'node_modules')
@@ -142,7 +141,7 @@ async function extractVersions(versionsToPeek: string[], nvmPath: string): Promi
 	)
 }
 
-async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: string): Promise<PackageInfo[]> {
+async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: string) {
 	const results = await Promise.all(
 		nodeModulesEntries.map(entry =>
 			isScopeEntry(entry) ? extractScopedPackage(nodeModulesPath, entry) : extractPlainPackage(nodeModulesPath, entry),
@@ -151,13 +150,13 @@ async function extractPackages(nodeModulesEntries: string[], nodeModulesPath: st
 	return results.flat()
 }
 
-async function extractPlainPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
+async function extractPlainPackage(nodeModulesPath: string, entry: string) {
 	const packageJsonPath = path.join(nodeModulesPath, entry, 'package.json')
 	const packageInfo = await extractPackageInfo(packageJsonPath)
 	return packageInfo ? [packageInfo] : []
 }
 
-async function extractScopedPackage(nodeModulesPath: string, entry: string): Promise<PackageInfo[]> {
+async function extractScopedPackage(nodeModulesPath: string, entry: string) {
 	const scopePath = path.join(nodeModulesPath, entry)
 
 	try {
@@ -175,7 +174,7 @@ async function extractScopedPackage(nodeModulesPath: string, entry: string): Pro
 	}
 }
 
-async function extractPackageInfo(packageJsonPath: string): Promise<{ name: string; version: string } | undefined> {
+async function extractPackageInfo(packageJsonPath: string): Promise<PackageInfo | undefined> {
 	try {
 		const packageJsonContent = await readFile(packageJsonPath, 'utf8')
 		const { name, version } = JSON.parse(packageJsonContent)

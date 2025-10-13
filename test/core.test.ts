@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { peek } from '../src/core.js'
-import * as extractor from '../src/extractor.js'
+import * as extractor from '../src/extractor-nvm.js'
 import * as display from '../src/display.js'
 
-vi.mock('../src/extractor.js')
+vi.mock('../src/extractor-nvm.js')
 vi.mock('../src/display.js')
 
 describe('peek', () => {

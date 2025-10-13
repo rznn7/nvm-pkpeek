@@ -1,7 +1,7 @@
 import { log } from 'node:console'
 import { Ansis } from 'ansis'
 import type { CliOptions } from './cli.js'
-import type { VersionInfo } from './extractor.js'
+import type { VersionInfo } from './extractor-nvm.js'
 
 export type DisplayOptions = Pick<CliOptions, 'format' | 'color'>
 

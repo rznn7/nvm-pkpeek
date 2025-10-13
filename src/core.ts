@@ -1,6 +1,6 @@
 import type { CliOptions } from './cli.js'
 import { display } from './display.js'
-import { extractNvmPackages } from './extractor.js'
+import { extractNvmPackages } from './extractor-nvm.js'
 
 export async function peek(nodeVersion: string | undefined, options: CliOptions) {
 	const { current = false } = options

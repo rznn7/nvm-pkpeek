@@ -5,9 +5,11 @@ import { peek } from './core.js'
 
 export interface CliOptions {
 	current?: boolean
-	format?: 'pretty' | 'unix'
+	format?: FormatOption
 	color?: boolean
 }
+
+export type FormatOption = 'pretty' | 'unix'
 
 export function setupCli() {
 	program
@@ -15,7 +17,7 @@ export function setupCli() {
 		.description('Know your globally installed node packages')
 		.version('0.1.0')
 		.argument('[node-version]', 'node version prefix to peek (e.g., "22" matches "22.x.x")')
-		.addOption(new Option('-c, --current', 'peek currently used node version'))
+		.addOption(new Option('-c, --current', 'peek the currently active Node version (npm global packages only)'))
 		.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']))
 		.addOption(new Option('--no-color', 'disable colored output (only affects pretty format)'))
 		.action(runCli)
@@ -28,6 +30,7 @@ async function runCli(nodeVersion: string | undefined, options: CliOptions) {
 		error(red('[nvm-pkpeek]: cannot use both [node-version] argument and -c/--current flag'))
 		process.exit(1)
 	}
+
 	try {
 		await peek(nodeVersion, options)
 	} catch (err) {

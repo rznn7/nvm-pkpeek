@@ -8,6 +8,7 @@ export interface CliOptions {
 	format?: FormatOption
 	color?: boolean
 	nodeVersion?: string
+	duplicatesOnly?: boolean
 }
 
 export type FormatOption = 'pretty' | 'unix'
@@ -28,6 +29,7 @@ export function setupCli() {
 				'current',
 			),
 		)
+		.addOption(new Option('-d, --duplicates-only', 'show only packages installed in multiple Node versions'))
 		.addOption(new Option('-f, --format <format>', 'output format').choices(['pretty', 'unix']))
 		.addOption(new Option('--no-color', 'disable colored output (only affects pretty format)'))
 		.action(runCli)

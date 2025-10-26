@@ -67,6 +67,15 @@ $ pkpeek --node-version 22
     typescript 5.3.0
 ```
 
+**Only duplicates:**
+```bash
+$ pkpeek ni -d
+▸ Node 22.20.0 (nvm)
+    @antfu/ni  26.1.0
+▸ PNPM
+    @antfu/ni  26.1.0
+```
+
 **Unix format output:**
 ```bash
 $ pkpeek --format unix
@@ -82,6 +91,7 @@ pnpm	-	@antfu/ni	27.0.0
   -V, --version                 output the version number
   -c, --current                 peek the currently active Node version (npm global packages only)
   -n, --node-version <version>  node version prefix to peek (e.g., "22" matches "22.x.x")
+  -d, --duplicates-only         show only packages installed in multiple Node versions
   -f, --format <format>         output format (choices: "pretty", "unix")
   --no-color                    disable colored output (only affects pretty format)
   -h, --help                    display help for command

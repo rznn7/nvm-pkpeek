@@ -14,26 +14,9 @@ A simple CLI tool to view globally installed packages across different Node.js v
 npm install -g nvm-pkpeek
 ```
 
-## Usage
-
-```bash
-# View all globally installed packages across all Node versions
-pkpeek
-
-# View packages for a specific Node version (prefix matching)
-pkpeek 22
-
-# View packages for the currently active Node version (npm only)
-pkpeek --current
-
-# Output in unix-friendly format (tab-separated)
-pkpeek --format unix
-
-# Disable colored output
-pkpeek --no-color
-```
-
 ## Examples
+
+![Made with VHS](https://vhs.charm.sh/vhs-5Umhtddk7ofU8cr2EEet7T.gif)
 
 **View all packages:**
 ```bash
@@ -69,7 +52,7 @@ $ pkpeek --node-version 22
 
 **Only duplicates:**
 ```bash
-$ pkpeek ni -d
+$ pkpeek ni --duplicates-only
 ▸ Node 22.20.0 (nvm)
     @antfu/ni  26.1.0
 ▸ PNPM

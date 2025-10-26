@@ -17,7 +17,7 @@ export function setupCli() {
 	program
 		.name('nvm-pkpeek')
 		.description('Know your globally installed node packages')
-		.version('0.1.0')
+		.version('0.2.0')
 		.argument('[package-name]', 'search for packages matching this name (partial match supported)')
 		.addOption(
 			new Option('-c, --current', 'peek the currently active Node version (npm global packages only)').conflicts(

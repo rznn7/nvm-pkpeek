@@ -36,6 +36,7 @@
 		"format": "pnpm exec biome format",
 		"test": "vitest run",
 		"test:run": "vitest run",
+		"test:watch": "vitest",
 		"prepublishOnly": "pnpm run build"
 	},
 	"packageManager": "pnpm@10.17.1",

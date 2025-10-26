@@ -1,8 +1,11 @@
-# nvm-pkpeek
+# 🔭 nvm-pkpeek
 
 > Know your globally installed node packages
 
 A simple CLI tool to view globally installed packages across different Node.js versions (managed by nvm) and pnpm.
+
+[![npm version](https://badge.fury.io/js/nvm-pkpeek.svg)](https://badge.fury.io/js/nvm-pkpeek)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Installation
 

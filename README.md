@@ -6,7 +6,7 @@ A simple CLI tool to view globally installed packages across different Node.js v
 
 [![npm version](https://badge.fury.io/js/nvm-pkpeek.svg)](https://badge.fury.io/js/nvm-pkpeek)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/rznn7/nvm-pkpeek/actions/workflows/ci.yml/badge.svg)](https://github.com/rznn7/nvm-pkpeek/actions/workflows/ci.yml)
+[![Test](https://github.com/rznn7/nvm-pkpeek/actions/workflows/test.yml/badge.svg)](https://github.com/rznn7/nvm-pkpeek/actions/workflows/test.yml)
 
 ## Installation
 

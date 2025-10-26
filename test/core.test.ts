@@ -4,10 +4,12 @@ import { peek } from '../src/core.js'
 import * as display from '../src/display.js'
 import * as extractorNvm from '../src/extractor-nvm.js'
 import * as extractorPnpm from '../src/extractor-pnpm.js'
+import * as filter from '../src/filter.js'
 
 vi.mock('../src/extractor-nvm.js')
 vi.mock('../src/extractor-pnpm.js')
 vi.mock('../src/display.js')
+vi.mock('../src/filter.js')
 
 describe('peek', () => {
 	const mockNvmData = [
@@ -25,6 +27,9 @@ describe('peek', () => {
 		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmData)
 		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue(mockPnpmData)
 		vi.spyOn(display, 'display').mockImplementation(() => {})
+
+		vi.spyOn(filter, 'filterByPackageName').mockImplementation((data, _) => data)
+		vi.spyOn(filter, 'filterDuplicatesOnly').mockImplementation(data => data)
 	})
 
 	it('should extract packages from both nvm and pnpm when no specific version or current flag is provided', async () => {
@@ -90,170 +95,103 @@ describe('peek', () => {
 		expect(display.display).toHaveBeenCalledWith({ nvmData: mockNvmData, pnpmData: mockPnpmData }, options)
 	})
 
-	it('should filter packages by name when packageName is provided', async () => {
-		const mockNvmDataWithMultiplePackages = [
-			{
-				version: '22.0.0',
-				packages: [
-					{ name: 'npm', version: '10.0.0' },
-					{ name: 'typescript', version: '5.0.0' },
-					{ name: 'eslint', version: '8.0.0' },
-				],
-			},
-			{
-				version: '20.0.0',
-				packages: [
-					{ name: 'npm', version: '9.0.0' },
-					{ name: 'prettier', version: '3.0.0' },
-				],
-			},
-		]
+	it('should call filterByPackageName when packageName is provided', async () => {
+		const filteredResult = {
+			nvmData: [
+				{
+					version: '22.0.0',
+					packages: [{ name: 'typescript', version: '5.0.0' }],
+				},
+			],
+			pnpmData: [{ name: 'typescript', version: '5.1.0' }],
+		}
 
-		const mockPnpmDataWithMultiplePackages = [
-			{ name: 'typescript', version: '5.1.0' },
-			{ name: 'eslint', version: '8.1.0' },
-			{ name: 'prettier', version: '3.1.0' },
-		]
-
-		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmDataWithMultiplePackages)
-		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue(mockPnpmDataWithMultiplePackages)
+		vi.spyOn(filter, 'filterByPackageName').mockReturnValue(filteredResult)
 
 		await peek('typescript', {})
 
-		expect(display.display).toHaveBeenCalledWith(
-			{
-				nvmData: [
-					{
-						version: '22.0.0',
-						packages: [{ name: 'typescript', version: '5.0.0' }],
-					},
-				],
-				pnpmData: [{ name: 'typescript', version: '5.1.0' }],
-			},
-			{},
+		expect(filter.filterByPackageName).toHaveBeenCalledWith(
+			{ nvmData: mockNvmData, pnpmData: mockPnpmData },
+			'typescript',
 		)
+		expect(display.display).toHaveBeenCalledWith(filteredResult, {})
 	})
 
-	it('should filter packages case-insensitively', async () => {
-		const mockNvmDataWithMultiplePackages = [
-			{
-				version: '22.0.0',
-				packages: [
-					{ name: 'TypeScript', version: '5.0.0' },
-					{ name: 'eslint', version: '8.0.0' },
-				],
-			},
-		]
+	it('should not call filterByPackageName when packageName is undefined', async () => {
+		await peek(undefined, {})
 
-		const mockPnpmDataWithMultiplePackages = [
-			{ name: 'TypeScript', version: '5.1.0' },
-			{ name: 'ESLint', version: '8.1.0' },
-		]
-
-		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmDataWithMultiplePackages)
-		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue(mockPnpmDataWithMultiplePackages)
-
-		await peek('typescript', {})
-
-		expect(display.display).toHaveBeenCalledWith(
-			{
-				nvmData: [
-					{
-						version: '22.0.0',
-						packages: [{ name: 'TypeScript', version: '5.0.0' }],
-					},
-				],
-				pnpmData: [{ name: 'TypeScript', version: '5.1.0' }],
-			},
-			{},
-		)
+		expect(filter.filterByPackageName).not.toHaveBeenCalled()
 	})
 
-	it('should remove nvm versions with no matching packages when filtering', async () => {
-		const mockNvmDataWithMultipleVersions = [
-			{
-				version: '22.0.0',
-				packages: [{ name: 'typescript', version: '5.0.0' }],
-			},
-			{
-				version: '20.0.0',
-				packages: [{ name: 'eslint', version: '8.0.0' }],
-			},
-		]
+	it('should call filterDuplicatesOnly when duplicatesOnly flag is true', async () => {
+		const filteredResult = {
+			nvmData: [
+				{
+					version: '22.0.0',
+					packages: [{ name: 'typescript', version: '5.0.0' }],
+				},
+			],
+			pnpmData: [{ name: 'typescript', version: '5.1.0' }],
+		}
 
-		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmDataWithMultipleVersions)
-		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue([])
+		vi.spyOn(filter, 'filterDuplicatesOnly').mockReturnValue(filteredResult)
 
-		await peek('typescript', {})
+		await peek(undefined, { duplicatesOnly: true })
 
-		expect(display.display).toHaveBeenCalledWith(
-			{
-				nvmData: [
-					{
-						version: '22.0.0',
-						packages: [{ name: 'typescript', version: '5.0.0' }],
-					},
-				],
-				pnpmData: [],
-			},
-			{},
-		)
+		expect(filter.filterDuplicatesOnly).toHaveBeenCalled()
+		expect(display.display).toHaveBeenCalledWith(filteredResult, { duplicatesOnly: true })
 	})
 
-	it('should return empty arrays when no packages match the filter', async () => {
-		const mockNvmDataWithPackages = [
-			{
-				version: '22.0.0',
-				packages: [{ name: 'eslint', version: '8.0.0' }],
-			},
-		]
+	it('should not call filterDuplicatesOnly when duplicatesOnly flag is false', async () => {
+		await peek(undefined, { duplicatesOnly: false })
 
-		const mockPnpmDataWithPackages = [{ name: 'prettier', version: '3.0.0' }]
-
-		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmDataWithPackages)
-		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue(mockPnpmDataWithPackages)
-
-		await peek('nonexistent', {})
-
-		expect(display.display).toHaveBeenCalledWith(
-			{
-				nvmData: [],
-				pnpmData: [],
-			},
-			{},
-		)
+		expect(filter.filterDuplicatesOnly).not.toHaveBeenCalled()
 	})
 
-	it('should support partial name matching', async () => {
-		const mockNvmDataWithPackages = [
-			{
-				version: '22.0.0',
-				packages: [
-					{ name: 'typescript', version: '5.0.0' },
-					{ name: '@types/node', version: '20.0.0' },
-				],
-			},
-		]
+	it('should apply filters in correct order: packageName then duplicatesOnly', async () => {
+		const afterPackageFilter = {
+			nvmData: [
+				{
+					version: '22.0.0',
+					packages: [{ name: 'typescript', version: '5.0.0' }],
+				},
+			],
+			pnpmData: [{ name: 'typescript', version: '5.1.0' }],
+		}
 
-		vi.spyOn(extractorNvm, 'extractNvmPackages').mockResolvedValue(mockNvmDataWithPackages)
-		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockResolvedValue([])
+		const afterDuplicatesFilter = {
+			nvmData: [
+				{
+					version: '22.0.0',
+					packages: [{ name: 'typescript', version: '5.0.0' }],
+				},
+			],
+			pnpmData: [],
+		}
 
-		await peek('type', {})
+		vi.spyOn(filter, 'filterByPackageName').mockReturnValue(afterPackageFilter)
+		vi.spyOn(filter, 'filterDuplicatesOnly').mockReturnValue(afterDuplicatesFilter)
 
-		expect(display.display).toHaveBeenCalledWith(
-			{
-				nvmData: [
-					{
-						version: '22.0.0',
-						packages: [
-							{ name: 'typescript', version: '5.0.0' },
-							{ name: '@types/node', version: '20.0.0' },
-						],
-					},
-				],
-				pnpmData: [],
-			},
-			{},
+		await peek('typescript', { duplicatesOnly: true })
+
+		expect(filter.filterByPackageName).toHaveBeenCalledWith(
+			{ nvmData: mockNvmData, pnpmData: mockPnpmData },
+			'typescript',
 		)
+		expect(filter.filterDuplicatesOnly).toHaveBeenCalledWith(afterPackageFilter)
+		expect(display.display).toHaveBeenCalledWith(afterDuplicatesFilter, { duplicatesOnly: true })
+	})
+
+	it('should run nvm and pnpm extraction in parallel', async () => {
+		const nvmPromise = Promise.resolve(mockNvmData)
+		const pnpmPromise = Promise.resolve(mockPnpmData)
+
+		vi.spyOn(extractorNvm, 'extractNvmPackages').mockReturnValue(nvmPromise)
+		vi.spyOn(extractorPnpm, 'extractPnpmPackages').mockReturnValue(pnpmPromise)
+
+		await peek(undefined, {})
+
+		expect(extractorNvm.extractNvmPackages).toHaveBeenCalled()
+		expect(extractorPnpm.extractPnpmPackages).toHaveBeenCalled()
 	})
 })

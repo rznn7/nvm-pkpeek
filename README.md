@@ -50,9 +50,18 @@ $ pkpeek
     @antfu/ni  27.0.0
 ```
 
+**Search for packages by name:**
+```bash
+$ pkpeek typescript
+▸ Node 22.0.0 (nvm)
+    typescript 5.3.0
+▸ PNPM
+    typescript 5.3.2
+```
+
 **View packages for Node 22.x:**
 ```bash
-$ pkpeek 22
+$ pkpeek --node-version 22
 ▸ Node 22.0.0 (nvm)
     pnpm       9.0.0
     typescript 5.3.0
@@ -70,11 +79,12 @@ pnpm	-	@antfu/ni	27.0.0
 ## Options
 
 ```
--c, --current       Peek the currently active Node version (npm global packages only)
--f, --format        Output format: 'pretty' (default) or 'unix'
---no-color          Disable colored output (only affects pretty format)
--h, --help          Display help information
--V, --version       Display version number
+  -V, --version                 output the version number
+  -c, --current                 peek the currently active Node version (npm global packages only)
+  -n, --node-version <version>  node version prefix to peek (e.g., "22" matches "22.x.x")
+  -f, --format <format>         output format (choices: "pretty", "unix")
+  --no-color                    disable colored output (only affects pretty format)
+  -h, --help                    display help for command
 ```
 
 ## Requirements

@@ -4,6 +4,26 @@
 	"description": "Know your globally installed node packages",
 	"main": "index.js",
 	"type": "module",
+	"author": "rznn7",
+	"license": "MIT",
+	"homepage": "https://github.com/rznn7/nvm-pkpeek#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/rznn7/nvm-pkpeek.git"
+	},
+	"bugs": {
+		"url": "https://github.com/rznn7/nvm-pkpeek/issues"
+	},
+	"keywords": [
+		"nvm",
+		"pnpm",
+		"node",
+		"nodejs",
+		"packages",
+		"global",
+		"cli",
+		"version-manager"
+	],
 	"exclude": [
 		"test"
 	],
@@ -14,11 +34,9 @@
 		"lint": "pnpm exec biome lint",
 		"format": "pnpm exec biome format",
 		"test": "vitest",
-		"test:run": "vitest run"
+		"test:run": "vitest run",
+		"prepublishOnly": "pnpm run build"
 	},
-	"keywords": [],
-	"author": "",
-	"license": "MIT",
 	"packageManager": "pnpm@10.17.1",
 	"engines": {
 		"node": ">=20.0.0"

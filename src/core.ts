@@ -3,12 +3,22 @@ import { display } from './display.js'
 import { extractNvmPackages } from './extractor-nvm.js'
 import { extractPnpmPackages } from './extractor-pnpm.js'
 import { normalizeVersion } from './package-extraction.js'
+import { yellow } from 'ansis'
 
 export async function peek(nodeVersion: string | undefined, options: CliOptions) {
 	const { current = false } = options
 	const versionFilter = getVersionFilter(nodeVersion, current)
-	const nvmData = await extractNvmPackages({ versionFilter })
-	const pnpmData = !current ? await extractPnpmPackages() : []
+
+	const nvmData = await extractNvmPackages({ versionFilter }).catch(() => {
+		console.warn(yellow('[nvm-pkpeek]: no nvm installation found.'))
+		return []
+	})
+	const pnpmData = current
+		? []
+		: await extractPnpmPackages().catch(() => {
+				console.warn(yellow('[nvm-pkpeek]: no pnpm installation found.'))
+				return []
+			})
 
 	display({ nvmData, pnpmData }, options)
 }

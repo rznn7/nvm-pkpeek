@@ -36,7 +36,8 @@
 		"format": "pnpm exec biome format",
 		"test": "vitest run",
 		"test:run": "vitest run",
-		"prepublishOnly": "pnpm run build"
+		"prepublishOnly": "pnpm run build",
+		"release:patch": "pnpm version patch && git push --follow-tags"
 	},
 	"packageManager": "pnpm@10.23.0",
 	"engines": {
